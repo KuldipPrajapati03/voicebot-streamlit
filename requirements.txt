@@ -13,3 +13,4 @@ langgraph==1.2.11
 typing_extensions==4.16.0
 pi-heif==1.4.0
 opencv-python-headless
+unstructured-pytesseract
