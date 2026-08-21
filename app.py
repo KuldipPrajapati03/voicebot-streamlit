@@ -4,6 +4,15 @@ import ast
 import shutil
 import streamlit as st
 
+try:
+    st._config.set_option("theme.base", "light")
+    st._config.set_option("theme.primaryColor", "#4f46e5")
+    st._config.set_option("theme.backgroundColor", "#f8fafc")
+    st._config.set_option("theme.secondaryBackgroundColor", "#f1f5f9")
+    st._config.set_option("theme.textColor", "#0f172a")
+except Exception:
+    pass
+
 # --- Unstructured & Chunking Imports ---
 from unstructured.partition.pdf import partition_pdf
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -205,7 +214,7 @@ def show_pdf_chunks(pdf_name):
     for doc_id, doc in doc_dict.items():
         src = doc.metadata.get("source")
         if src == pdf_name:
-            page = doc.metadata.get("page", 0) + 1
+            page = doc.metadata.get("page", 1)
             chunks_info.append((page, doc.page_content))
 
     chunks_info.sort(key=lambda x: x[0])
@@ -229,6 +238,27 @@ def show_pdf_chunks(pdf_name):
             <button id="copyBtn" class="copy-btn" onclick="copyToClip()">📋 Copy Text</button>
         </div>
         <script>
+        function isParentDark() {{
+            try {{
+                const doc = window.parent.document;
+                const theme = doc.documentElement.getAttribute('data-theme');
+                if (theme) return theme === 'dark';
+                return window.parent.matchMedia && window.parent.matchMedia('(prefers-color-scheme: dark)').matches;
+            }} catch (e) {{
+                return false;
+            }}
+        }}
+
+        (function applyTheme() {{
+            const dark = isParentDark();
+            const btn = document.getElementById("copyBtn");
+            if (dark) {{
+                btn.style.backgroundColor = "#1e293b";
+                btn.style.color = "#f1f5f9";
+                btn.style.borderColor = "#334155";
+            }}
+        }})();
+
         function copyToClip() {{
             const text = {escaped_text};
             function handleSuccess() {{
@@ -239,9 +269,7 @@ def show_pdf_chunks(pdf_name):
                 btn.style.borderColor = "#22c55e";
                 setTimeout(function() {{
                     btn.innerHTML = "📋 Copy Text";
-                    btn.style.backgroundColor = "";
-                    btn.style.color = "";
-                    btn.style.borderColor = "";
+                    applyTheme();
                 }}, 2000);
             }}
             if (window.parent && window.parent.navigator && window.parent.navigator.clipboard) {{
@@ -351,6 +379,36 @@ chat_css = """
     --radius-xl: 16px;
 }
 
+/* ============================================
+   DARK THEME OVERRIDES (Option 2)
+   Only reachable when FORCE_LIGHT_THEME = False
+   ============================================ */
+[data-theme="dark"] {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #1e293b;
+    --bg-sidebar: #0f172a;
+    --bg-card: #1e293b;
+    --bg-input: #1e293b;
+    --bg-hover: #334155;
+    --bg-chat-user: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    --bg-chat-assistant: #1e293b;
+    --border-primary: #334155;
+    --border-secondary: #475569;
+    --border-focus: #818cf8;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-inverse: #ffffff;
+    --accent-primary: #818cf8;
+    --accent-secondary: #6366f1;
+    --accent-hover: #a5b4fc;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+}
+
 html, body, [class*="css"] {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
@@ -399,6 +457,10 @@ header[data-testid="stHeader"] {
     height: 3.75rem !important;
 }
 
+[data-theme="dark"] header[data-testid="stHeader"] {
+    background: rgba(15, 23, 42, 0.85) !important;
+}
+
 header[data-testid="stHeader"]::before {
     content: "⚡ Enterprise RAG Assistant";
     position: absolute;
@@ -431,7 +493,7 @@ header[data-testid="stHeader"]::before {
 }
 
 /* --- Input Fields & Form Controls --- */
-div[data-testid="stTextInput"] input, 
+div[data-testid="stTextInput"] input,
 div[data-testid="stSelectbox"] > div > div {
     background-color: var(--bg-input) !important;
     border: 1px solid var(--border-primary) !important;
@@ -582,6 +644,10 @@ div[data-testid*="DialogHeader"] {
     display: none !important;
 }
 
+div[role="dialog"] button[kind="header"] svg {
+    color: var(--text-primary) !important;
+}
+
 /* --- Welcome State (Empty Chat) --- */
 .welcome-state {
     display: flex;
@@ -614,9 +680,96 @@ div[data-testid*="DialogHeader"] {
     line-height: 1.6;
     color: var(--text-secondary);
 }
-</style>
 
+/* --- Elements not covered above, needed for a clean dark theme too --- */
+
+/* st.warning / st.success / st.error boxes */
+[data-testid="stAlert"] {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-primary) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-md) !important;
+}
+[data-testid="stAlert"] p {
+    color: var(--text-primary) !important;
+}
+
+/* st.expander (chunk viewer) */
+div[data-testid="stExpander"] {
+    background-color: var(--bg-card) !important;
+    border: 1px solid var(--border-primary) !important;
+    border-radius: var(--radius-md) !important;
+}
+div[data-testid="stExpander"] summary {
+    color: var(--text-primary) !important;
+}
+div[data-testid="stExpander"] summary:hover {
+    color: var(--accent-primary) !important;
+}
+
+/* st.text_area (chunk content display) */
+textarea {
+    background-color: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-primary) !important;
+}
+textarea:disabled {
+    -webkit-text-fill-color: var(--text-primary) !important;
+    opacity: 1 !important;
+}
+
+/* st.checkbox label ("Expand All") */
+label[data-baseweb="checkbox"] span {
+    color: var(--text-secondary) !important;
+}
+
+/* st.selectbox closed box text */
+div[data-testid="stSelectbox"] span {
+    color: var(--text-primary) !important;
+}
+
+/* st.selectbox dropdown popover — renders in a portal outside the input */
+div[data-baseweb="popover"] ul,
+div[data-baseweb="menu"],
+div[data-baseweb="popover"] div {
+    background-color: var(--bg-card) !important;
+}
+div[data-baseweb="popover"] li,
+div[data-baseweb="menu"] li {
+    color: var(--text-primary) !important;
+}
+div[data-baseweb="popover"] li:hover,
+div[data-baseweb="menu"] li:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+/* Main app text fallback (headers, captions, plain markdown) */
+.stApp p, .stApp span, .stApp label {
+    color: var(--text-primary);
+}
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: var(--text-muted) !important;
+}
+
+/* Spinner text */
+.stSpinner > div {
+    color: var(--text-secondary) !important;
+}
+</style>
 """
+
+chat_css = chat_css.replace(
+    "</style>",
+    """
+#MainMenu {
+    visibility: hidden !important;
+}
+[data-testid="stToolbar"] {
+    visibility: hidden !important;
+}
+</style>"""
+    )
+
 st.html(chat_css)
 
 # Intercept close/reload window if data active in session
@@ -679,7 +832,7 @@ with st.sidebar:
 
     st.divider()
     st.header("📂 Knowledge Base")
-    uploaded_file = st.file_uploader("Upload Document", type=["pdf"])
+    uploaded_file = st.file_uploader("Upload Document", type=["pdf"], accept_multiple_files=True)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -833,6 +986,27 @@ def render_action_buttons(content, idx):
         </button>
     </div>
     <script>
+    function isParentDark() {{
+        try {{
+            const doc = window.parent.document;
+            const theme = doc.documentElement.getAttribute('data-theme');
+            if (theme) return theme === 'dark';
+            return window.parent.matchMedia && window.parent.matchMedia('(prefers-color-scheme: dark)').matches;
+        }} catch (e) {{
+            return false;
+        }}
+    }}
+
+    const dark = isParentDark();
+    const mutedColor = dark ? "#64748b" : "#94a3b8";
+    const hoverBg = dark ? "#334155" : "#f1f5f9";
+    document.querySelectorAll(".action-btn").forEach(function(b) {{
+        b.style.color = mutedColor;
+    }});
+    const styleTag = document.createElement("style");
+    styleTag.innerHTML = ".action-btn:hover {{ background-color: " + hoverBg + " !important; }}";
+    document.head.appendChild(styleTag);
+
     const msgId = "like_state_" + {idx};
     const textToCopy = {escaped_plain_text};
 
@@ -875,7 +1049,7 @@ def render_action_buttons(content, idx):
         const liked = btn.getAttribute("data-liked") === "true";
         if (liked) {{
             btn.setAttribute("data-liked", "false");
-            btn.style.color = "#94a3b8";
+            btn.style.color = mutedColor;
             btn.querySelector("svg").removeAttribute("fill");
             btn.querySelector("svg").setAttribute("stroke", "currentColor");
             localStorage.setItem(msgId, "false");
@@ -910,7 +1084,6 @@ def render_action_buttons(content, idx):
         cursor: pointer;
         padding: 6px;
         border-radius: 4px;
-        color: #94a3b8;
         transition: all 0.2s ease;
         display: flex;
         align-items: center;
@@ -919,7 +1092,6 @@ def render_action_buttons(content, idx):
     }}
     .action-btn:hover {{
         color: #4f46e5;
-        background-color: #f1f5f9;
     }}
     .icon-svg {{
         width: 16px;
