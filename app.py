@@ -1094,9 +1094,8 @@ def get_plain_text(content):
     if "\n\n**Sources:**" in content:
         return content.split("\n\n**Sources:**")[0].strip()
     if "\n\n*(Answer generated using general AI knowledge)*" in content:
-        return content.split("\n\n*(AI knowledge)*")[0].strip()
+        return content.split("\n\n*(AI knowledge )*")[0].strip()
     return content.strip()
-
 
 def render_action_buttons(content, idx):
     plain_text = get_plain_text(content)
