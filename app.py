@@ -780,15 +780,19 @@ st.html(chat_css)
 # Reopen sidebar script via header settings button (⚙️)
 reopen_sidebar_js = """
 <script>
-(function() {
+function() {
     let parentDoc = document;
+    let accessMode = "fallback(document)";
     try {
         if (window.parent && window.parent.document && window.parent.document.body) {
             parentDoc = window.parent.document;
+            accessMode = "window.parent.document";
         }
     } catch (e) {
+        console.error("[sidebarDebug] parent access threw:", e.name, e.message);
         parentDoc = document;
     }
+    console.log("[sidebarDebug] using:", accessMode, "| parentDoc.title:", parentDoc.title, "| parentDoc.body children:", parentDoc.body ? parentDoc.body.childElementCount : "no body");
 
     function updateSidebarToggleUI() {
         try {
