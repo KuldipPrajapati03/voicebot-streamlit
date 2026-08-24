@@ -780,7 +780,7 @@ st.html(chat_css)
 # Reopen sidebar script via header settings button (⚙️)
 reopen_sidebar_js = """
 <script>
-function() {
+(function() {
     let parentDoc = document;
     let accessMode = "fallback(document)";
     try {
