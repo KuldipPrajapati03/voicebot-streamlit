@@ -1019,92 +1019,90 @@ reopen_sidebar_js = """
 (function() {
     const doc = document;
 
-    function updateSidebarToggleUI() {
-        try {
-            // 1. Find the Streamlit Header
-            const header = doc.querySelector('header[data-testid="stHeader"]');
-            if (!header) return;
-            // 2. Create the custom Gear button if it doesn't exist
-            let gearBtn = doc.getElementById("customSettingsBtn");
-            if (!gearBtn) {
-                gearBtn = doc.createElement("button");
-                gearBtn.id = "customSettingsBtn";
-                gearBtn.innerHTML = "⚙️";
-                gearBtn.style.cssText = `
-                    position: absolute;
-                    left: 1rem;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    font-size: 1.5rem;
-                    z-index: 999999;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: var(--text-primary);
-                `;
-                gearBtn.onclick = function(e) {
-                    e.preventDefault();
-                    // STREAMLIT CLOUD SPECIFIC SELECTORS:
-                    // Try finding the button inside the collapsed control div
-                    const collapsedControl = doc.querySelector('[data-testid="stSidebarCollapsedControl"]');
-                    const openButton = collapsedControl ? collapsedControl.querySelector('button') : null;
-                    const fallbackButton = doc.querySelector('button[aria-label="Open sidebar"]');
-                    const target = openButton || fallbackButton;
-                    if (target) {
-                        // Using MouseEvent instead of .click() is more reliable in React apps
-                        const clickEvent = new MouseEvent('click', {
-                            view: window,
-                            bubbles: true,
-                            cancelable: true
-                        });
-                        target.dispatchEvent(clickEvent);
-                    } else {
-                        console.log("Streamlit sidebar button not found in DOM");
-                    }
-                };
-                header.appendChild(gearBtn);
-            }
-            // 3. Logic to show/hide the button based on sidebar state
-            // Check if the sidebar is physically present and expanded
-            const sidebar = doc.querySelector('[data-testid="stSidebar"]');
-            const collapsedControl = doc.querySelector('[data-testid="stSidebarCollapsedControl"]');
-            // If the control (the '>' icon) is visible, it means the sidebar is closed
-            const isClosed = collapsedControl && collapsedControl.offsetParent !== null;
+    // 1. Function to trigger the sidebar toggle
+    function toggleSidebar() {
+        // Broad selectors to find the Streamlit "Open" button
+        const selectors = [
+            '[data-testid="stSidebarCollapsedControl"] button',
+            'button[aria-label="Open sidebar"]',
+            '.st-emotion-cache-6qob1r', // Common dynamic class
+            '[data-testid="collapsedSidebar"]'
+        ];
+        let target = null;
+        for (let s of selectors) {
+            target = doc.querySelector(s);
+            if (target) break;
+        }
 
-            if (isClosed) {
-                gearBtn.style.display = "flex";
-                let styleEl = doc.getElementById("customHeaderStyle");
-                if (!styleEl) {
-                    styleEl = doc.createElement("style");
-                    styleEl.id = "customHeaderStyle";
-                    doc.head.appendChild(styleEl);
-                }
-                styleEl.innerHTML = `
-                    header[data-testid="stHeader"]::before {
-                        left: 3.5rem !important;
-                    }
-                `;
-            } else {
-                gearBtn.style.display = "none";
-                let styleEl = doc.getElementById("customHeaderStyle");
-                if (styleEl) {
-                    styleEl.innerHTML = `
-                        header[data-testid="stHeader"]::before {
-                            left: 1.5rem !important;
-                        }
-                    `;
-                }
-            }
-        } catch (e) {
-            console.error("Sidebar JS Error:", e);
+        if (target) {
+            target.click();
+            // Fallback for React: trigger a full mouse event
+            target.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, view: window}));
         }
     }
 
-    // Run frequently to catch UI changes
-    setInterval(updateSidebarToggleUI, 300);
+    // 2. Function to create/ensure the gear button exists
+    function ensureGearButton() {
+        const header = doc.querySelector('header[data-testid="stHeader"]');
+        if (!header) return;
+
+        let gearBtn = doc.getElementById("customSettingsBtn");
+        // If button doesn't exist, create it
+        if (!gearBtn) {
+            gearBtn = doc.createElement("button");
+            gearBtn.id = "customSettingsBtn";
+            gearBtn.innerHTML = "⚙️";
+            gearBtn.style.cssText = `
+                position: absolute;
+                left: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                cursor: pointer;
+                font-size: 24px;
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 5px;
+            `;
+            gearBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleSidebar();
+            };
+            header.appendChild(gearBtn);
+        }
+
+        // 3. Logic: Should the button be visible?
+        // We show the gear ONLY if the sidebar is closed.
+        const sidebar = doc.querySelector('[data-testid="stSidebar"]');
+        const isSidebarVisible = sidebar && sidebar.getBoundingClientRect().width > 0;
+
+        if (!isSidebarVisible) {
+            gearBtn.style.display = "flex";
+            // Adjust the header title text offset
+            header.style.paddingLeft = "45px"; 
+        } else {
+            gearBtn.style.display = "none";
+            header.style.paddingLeft = "0px";
+        }
+    }
+
+    // 4. THE FIX: MutationObserver
+    // This watches the body for ANY changes and ensures our button stays in the header
+    const observer = new MutationObserver(() => {
+        ensureGearButton();
+    });
+
+    observer.observe(doc.body, {
+        childList: true,
+        subtree: true
+    });
+
+    // Initial call
+    ensureGearButton();
 })();
 </script>
 """
