@@ -3,6 +3,11 @@ import uuid
 import ast
 import shutil
 import streamlit as st
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+groq_api_key = os.environ.get("GROQ_API_KEY")
 
 try:
     st._config.set_option("theme.base", "light")
@@ -768,9 +773,136 @@ chat_css = chat_css.replace(
     visibility: hidden !important;
 }
 </style>"""
-    )
+)
 
 st.html(chat_css)
+
+# Reopen sidebar script via header settings button (⚙️)
+reopen_sidebar_js = """
+<script>
+(function() {
+    let parentDoc = document;
+    try {
+        if (window.parent && window.parent.document && window.parent.document.body) {
+            parentDoc = window.parent.document;
+        }
+    } catch (e) {
+        parentDoc = document;
+    }
+
+    function updateSidebarToggleUI() {
+        try {
+            const header = parentDoc.querySelector('header[data-testid="stHeader"]');
+            if (!header) return;
+
+            let button = parentDoc.getElementById("customSettingsBtn");
+            if (!button) {
+                button = parentDoc.createElement("button");
+                button.id = "customSettingsBtn";
+                button.innerHTML = "⚙️";
+                button.style.position = "absolute";
+                button.style.left = "1.5rem";
+                button.style.top = "50%";
+                button.style.transform = "translateY(-50%)";
+                button.style.background = "none";
+                button.style.border = "none";
+                button.style.cursor = "pointer";
+                button.style.fontSize = "1.25rem";
+                button.style.zIndex = "999999";
+                button.style.padding = "4px";
+                button.style.display = "none";
+                button.style.alignItems = "center";
+                button.style.justifyContent = "center";
+                button.style.color = "var(--text-primary)";
+                button.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+
+                button.onmouseover = function() {
+                    button.style.opacity = "0.7";
+                    button.style.transform = "translateY(-50%) scale(1.1)";
+                };
+                button.onmouseout = function() {
+                    button.style.opacity = "1.0";
+                    button.style.transform = "translateY(-50%) scale(1.0)";
+                };
+
+                button.onclick = function() {
+                    const collapsedBtn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
+                                         parentDoc.querySelector('[data-testid="collapsedSidebar"] button') || 
+                                         parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+                                         parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+                                         parentDoc.querySelector('button[aria-label="Open sidebar"]');
+                    if (collapsedBtn) {
+                        collapsedBtn.click();
+                    } else {
+                        const closeBtn = parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button') ||
+                                         parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"]') ||
+                                         parentDoc.querySelector('button[aria-label="Close sidebar"]');
+                        if (closeBtn) {
+                            closeBtn.click();
+                        }
+                    }
+                };
+
+                header.appendChild(button);
+            }
+
+            // Robust check if sidebar is collapsed (closed)
+            const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
+            const collapsedControl = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') || 
+                                     parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+                                     parentDoc.querySelector('button[aria-label="Open sidebar"]');
+
+            let isClosed = false;
+            if (collapsedControl) {
+                isClosed = true;
+            } else if (sidebar) {
+                const ariaExpanded = sidebar.getAttribute('aria-expanded');
+                if (ariaExpanded === 'false') {
+                    isClosed = true;
+                } else {
+                    const rect = sidebar.getBoundingClientRect();
+                    if (rect.width === 0 || rect.left < 0) {
+                        isClosed = true;
+                    }
+                }
+            } else {
+                isClosed = true;
+            }
+
+            // Obtain or create custom header offset style
+            let styleEl = parentDoc.getElementById("customHeaderStyle");
+            if (!styleEl) {
+                styleEl = parentDoc.createElement("style");
+                styleEl.id = "customHeaderStyle";
+                parentDoc.head.appendChild(styleEl);
+            }
+
+            if (isClosed) {
+                button.style.display = "flex";
+                styleEl.innerHTML = `
+                    header[data-testid="stHeader"]::before {
+                        left: 3.5rem !important;
+                    }
+                `;
+            } else {
+                button.style.display = "none";
+                styleEl.innerHTML = `
+                    header[data-testid="stHeader"]::before {
+                        left: 1.5rem !important;
+                    }
+                `;
+            }
+        } catch (e) {
+            console.error("Error managing custom settings button:", e);
+        }
+    }
+
+    updateSidebarToggleUI();
+    setInterval(updateSidebarToggleUI, 200);
+})();
+</script>
+"""
+st.html(reopen_sidebar_js, unsafe_allow_javascript=True)
 
 # Intercept close/reload window if data active in session
 if st.session_state.get("vectorstore") is not None:
@@ -819,18 +951,13 @@ with st.sidebar:
         """
         <div class="developer-info">
             <div class="developer-label">Developed By</div>
-            <div class="developer-name">Kuldip Prajapati</div>
-            <a href="mailto:kuldipprajapati003@gmail.com" class="developer-contact">Contact</a>
+            <a href="https://www.linkedin.com/in/kuldip-prajapati" target="_blank" class="developer-name">Kuldip Prajapati</a>
         </div>
         """,
         unsafe_allow_html=True
     )
     st.divider()
 
-    st.header("🔑 Authentication")
-    groq_api_key = st.text_input("Groq API Key", type="password", placeholder="gsk_...")
-
-    st.divider()
     st.header("📂 Knowledge Base")
     uploaded_file = st.file_uploader("Upload Document", type=["pdf"], accept_multiple_files=True)
 
@@ -1136,7 +1263,7 @@ else:
 
 if prompt_input := st.chat_input("Ask anything about your documents..."):
     if not groq_api_key:
-        st.warning("Please provide a valid Groq API Key in the left panel to continue.")
+        st.warning("Please provide a valid Groq API Key in the .env file to continue.")
     else:
         st.session_state.messages.append({"role": "user", "content": prompt_input})
         with st.chat_message("user"):
