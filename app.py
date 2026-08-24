@@ -844,6 +844,8 @@ reopen_sidebar_js = """
                 };
 
                 header.appendChild(button);
+            } else if (button.parentNode !== header) {
+                header.appendChild(button);
             }
 
             // Robust check if sidebar is collapsed (closed)
@@ -874,6 +876,8 @@ reopen_sidebar_js = """
             if (!styleEl) {
                 styleEl = parentDoc.createElement("style");
                 styleEl.id = "customHeaderStyle";
+                parentDoc.head.appendChild(styleEl);
+            } else if (styleEl.parentNode !== parentDoc.head) {
                 parentDoc.head.appendChild(styleEl);
             }
 
