@@ -187,7 +187,7 @@ Answer:"""
         formatted_sources = " | ".join(citation_strings)
         final_response = f"{answer}\n\n**Sources:** {formatted_sources}"
     else:
-        final_response = f"{answer}\n\n*(Answer generated using general AI knowledge)*"
+        final_response = f"{answer}\n\n*(AI knowledge)*"
 
     return {"response": final_response}
 
@@ -1090,7 +1090,7 @@ def get_plain_text(content):
     if "\n\n**Sources:**" in content:
         return content.split("\n\n**Sources:**")[0].strip()
     if "\n\n*(Answer generated using general AI knowledge)*" in content:
-        return content.split("\n\n*(Answer generated using general AI knowledge)*")[0].strip()
+        return content.split("\n\n*(AI knowledge)*")[0].strip()
     return content.strip()
 
 
