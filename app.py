@@ -793,8 +793,13 @@ reopen_sidebar_js = """
     function updateSidebarToggleUI() {
         try {
             const header = parentDoc.querySelector('header[data-testid="stHeader"]');
-            if (!header) return;
-
+            if (!header) {
+            console.log("[sidebarDebug] header not found");
+            return;
+            }
+            console.log("[sidebarDebug] header found. parentDoc === document?", parentDoc === document);
+ 
+ 
             let button = parentDoc.getElementById("customSettingsBtn");
             if (!button) {
                 button = parentDoc.createElement("button");
@@ -815,7 +820,7 @@ reopen_sidebar_js = """
                 button.style.justifyContent = "center";
                 button.style.color = "var(--text-primary)";
                 button.style.transition = "opacity 0.2s ease, transform 0.2s ease";
-
+ 
                 button.onmouseover = function() {
                     button.style.opacity = "0.7";
                     button.style.transform = "translateY(-50%) scale(1.1)";
@@ -824,7 +829,7 @@ reopen_sidebar_js = """
                     button.style.opacity = "1.0";
                     button.style.transform = "translateY(-50%) scale(1.0)";
                 };
-
+ 
                 button.onclick = function() {
                     const collapsedBtn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
                                          parentDoc.querySelector('[data-testid="collapsedSidebar"] button') || 
@@ -842,18 +847,18 @@ reopen_sidebar_js = """
                         }
                     }
                 };
-
+ 
                 header.appendChild(button);
             } else if (button.parentNode !== header) {
                 header.appendChild(button);
             }
-
+ 
             // Robust check if sidebar is collapsed (closed)
             const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
             const collapsedControl = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') || 
                                      parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
                                      parentDoc.querySelector('button[aria-label="Open sidebar"]');
-
+            console.log("[sidebarDebug] sidebar found?", !!sidebar, "collapsedControl found?", !!collapsedControl);
             let isClosed = false;
             if (collapsedControl) {
                 isClosed = true;
@@ -870,7 +875,7 @@ reopen_sidebar_js = """
             } else {
                 isClosed = true;
             }
-
+ 
             // Obtain or create custom header offset style
             let styleEl = parentDoc.getElementById("customHeaderStyle");
             if (!styleEl) {
@@ -880,7 +885,7 @@ reopen_sidebar_js = """
             } else if (styleEl.parentNode !== parentDoc.head) {
                 parentDoc.head.appendChild(styleEl);
             }
-
+ 
             if (isClosed) {
                 button.style.display = "flex";
                 styleEl.innerHTML = `
