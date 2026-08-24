@@ -916,11 +916,107 @@ st.html(chat_css)
 # </script>
 # """
 
+# reopen_sidebar_js = """
+# <script>
+# (function() {
+#     // On Cloud, we cannot access window.parent.document due to CORS.
+#     // We must stick to 'document'.
+#     const doc = document;
+#
+#     function updateSidebarToggleUI() {
+#         try {
+#             // 1. Find the Streamlit Header
+#             const header = doc.querySelector('header[data-testid="stHeader"]');
+#             if (!header) return;
+#
+#             // 2. Manage our custom Gear button
+#             let button = doc.getElementById("customSettingsBtn");
+#             if (!button) {
+#                 button = doc.createElement("button");
+#                 button.id = "customSettingsBtn";
+#                 button.innerHTML = "⚙️";
+#                 button.style.cssText = `
+#                     position: absolute;
+#                     left: 1rem;
+#                     top: 50%;
+#                     transform: translateY(-50%);
+#                     background: none;
+#                     border: none;
+#                     cursor: pointer;
+#                     font-size: 1.5rem;
+#                     z-index: 999999;
+#                     display: flex;
+#                     align-items: center;
+#                     justify-content: center;
+#                     color: var(--text-primary);
+#                     transition: transform 0.2s ease;
+#                 `;
+#
+#                 button.onclick = function() {
+#                     // Find the native Streamlit collapse/expand button
+#                     const openBtn = doc.querySelector('button[aria-label="Open sidebar"]');
+#                     const closeBtn = doc.querySelector('button[aria-label="Close sidebar"]');
+#
+#                     if (openBtn) {
+#                         openBtn.click();
+#                     } else if (closeBtn) {
+#                         // Optional: if you want the gear to also close it
+#                         closeBtn.click();
+#                     }
+#                 };
+#
+#                 header.appendChild(button);
+#             }
+#
+#             // 3. Logic to show/hide the button based on sidebar state
+#             // We check if the sidebar is currently hidden
+#             const sidebar = doc.querySelector('[data-testid="stSidebar"]');
+#             const isCollapsed = !sidebar || sidebar.getAttribute('aria-expanded') === 'false';
+#
+#             // Check for the specific 'collapsed control' element Streamlit uses
+#             const collapsedControl = doc.querySelector('[data-testid="stSidebarCollapsedControl"]');
+#
+#             if (collapsedControl || isCollapsed) {
+#                 button.style.display = "flex";
+#                 // Shift the "Enterprise RAG Assistant" text to the right so it doesn't overlap
+#                 let styleEl = doc.getElementById("customHeaderStyle");
+#                 if (!styleEl) {
+#                     styleEl = doc.createElement("style");
+#                     styleEl.id = "customHeaderStyle";
+#                     doc.head.appendChild(styleEl);
+#                 }
+#                 styleEl.innerHTML = `
+#                     header[data-testid="stHeader"]::before {
+#                         left: 3.5rem !important;
+#                     }
+#                 `;
+#             } else {
+#                 // If sidebar is open, we can hide our custom gear (since native 'X' is visible)
+#                 button.style.display = "none";
+#                 let styleEl = doc.getElementById("customHeaderStyle");
+#                 if (styleEl) {
+#                     styleEl.innerHTML = `
+#                         header[data-testid="stHeader"]::before {
+#                             left: 1.5rem !important;
+#                         }
+#                     `;
+#                 }
+#             }
+#         } catch (e) {
+#             console.error("Sidebar JS Error:", e);
+#         }
+#     }
+#
+#     // Run frequently to catch UI changes
+#     setInterval(updateSidebarToggleUI, 300);
+# })();
+# </script>
+# """
+
+
 reopen_sidebar_js = """
 <script>
 (function() {
-    // On Cloud, we cannot access window.parent.document due to CORS.
-    // We must stick to 'document'.
     const doc = document;
 
     function updateSidebarToggleUI() {
@@ -928,14 +1024,13 @@ reopen_sidebar_js = """
             // 1. Find the Streamlit Header
             const header = doc.querySelector('header[data-testid="stHeader"]');
             if (!header) return;
-
-            // 2. Manage our custom Gear button
-            let button = doc.getElementById("customSettingsBtn");
-            if (!button) {
-                button = doc.createElement("button");
-                button.id = "customSettingsBtn";
-                button.innerHTML = "⚙️";
-                button.style.cssText = `
+            // 2. Create the custom Gear button if it doesn't exist
+            let gearBtn = doc.getElementById("customSettingsBtn");
+            if (!gearBtn) {
+                gearBtn = doc.createElement("button");
+                gearBtn.id = "customSettingsBtn";
+                gearBtn.innerHTML = "⚙️";
+                gearBtn.style.cssText = `
                     position: absolute;
                     left: 1rem;
                     top: 50%;
@@ -949,36 +1044,38 @@ reopen_sidebar_js = """
                     align-items: center;
                     justify-content: center;
                     color: var(--text-primary);
-                    transition: transform 0.2s ease;
                 `;
-
-                button.onclick = function() {
-                    // Find the native Streamlit collapse/expand button
-                    const openBtn = doc.querySelector('button[aria-label="Open sidebar"]');
-                    const closeBtn = doc.querySelector('button[aria-label="Close sidebar"]');
-
-                    if (openBtn) {
-                        openBtn.click();
-                    } else if (closeBtn) {
-                        // Optional: if you want the gear to also close it
-                        closeBtn.click();
+                gearBtn.onclick = function(e) {
+                    e.preventDefault();
+                    // STREAMLIT CLOUD SPECIFIC SELECTORS:
+                    // Try finding the button inside the collapsed control div
+                    const collapsedControl = doc.querySelector('[data-testid="stSidebarCollapsedControl"]');
+                    const openButton = collapsedControl ? collapsedControl.querySelector('button') : null;
+                    const fallbackButton = doc.querySelector('button[aria-label="Open sidebar"]');
+                    const target = openButton || fallbackButton;
+                    if (target) {
+                        // Using MouseEvent instead of .click() is more reliable in React apps
+                        const clickEvent = new MouseEvent('click', {
+                            view: window,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        target.dispatchEvent(clickEvent);
+                    } else {
+                        console.log("Streamlit sidebar button not found in DOM");
                     }
                 };
-
-                header.appendChild(button);
+                header.appendChild(gearBtn);
             }
-
             // 3. Logic to show/hide the button based on sidebar state
-            // We check if the sidebar is currently hidden
+            // Check if the sidebar is physically present and expanded
             const sidebar = doc.querySelector('[data-testid="stSidebar"]');
-            const isCollapsed = !sidebar || sidebar.getAttribute('aria-expanded') === 'false';
-
-            // Check for the specific 'collapsed control' element Streamlit uses
             const collapsedControl = doc.querySelector('[data-testid="stSidebarCollapsedControl"]');
+            // If the control (the '>' icon) is visible, it means the sidebar is closed
+            const isClosed = collapsedControl && collapsedControl.offsetParent !== null;
 
-            if (collapsedControl || isCollapsed) {
-                button.style.display = "flex";
-                // Shift the "Enterprise RAG Assistant" text to the right so it doesn't overlap
+            if (isClosed) {
+                gearBtn.style.display = "flex";
                 let styleEl = doc.getElementById("customHeaderStyle");
                 if (!styleEl) {
                     styleEl = doc.createElement("style");
@@ -991,8 +1088,7 @@ reopen_sidebar_js = """
                     }
                 `;
             } else {
-                // If sidebar is open, we can hide our custom gear (since native 'X' is visible)
-                button.style.display = "none";
+                gearBtn.style.display = "none";
                 let styleEl = doc.getElementById("customHeaderStyle");
                 if (styleEl) {
                     styleEl.innerHTML = `
