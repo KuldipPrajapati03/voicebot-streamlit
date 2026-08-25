@@ -187,7 +187,7 @@ Answer:"""
         formatted_sources = " | ".join(citation_strings)
         final_response = f"{answer}\n\n**Sources:** {formatted_sources}"
     else:
-        final_response = f"{answer}\n\n*(AI knowledge)*"
+        final_response = f"{answer}\n\n*(Answer generated using general AI knowledge)*"
 
     return {"response": final_response}
 
@@ -778,331 +778,131 @@ chat_css = chat_css.replace(
 st.html(chat_css)
 
 # Reopen sidebar script via header settings button (⚙️)
-# reopen_sidebar_js = """
-# <script>
-# (function() {
-#     let parentDoc = document;
-#     let accessMode = "fallback(document)";
-#     try {
-#         if (window.parent && window.parent.document && window.parent.document.body) {
-#             parentDoc = window.parent.document;
-#             accessMode = "window.parent.document";
-#         }
-#     } catch (e) {
-#         console.error("[sidebarDebug] parent access threw:", e.name, e.message);
-#         parentDoc = document;
-#     }
-#     console.log("[sidebarDebug] using:", accessMode, "| parentDoc.title:", parentDoc.title, "| parentDoc.body children:", parentDoc.body ? parentDoc.body.childElementCount : "no body");
-#
-#     function updateSidebarToggleUI() {
-#         try {
-#             const header = parentDoc.querySelector('header[data-testid="stHeader"]');
-#             if (!header) {
-#             console.log("[sidebarDebug] header not found");
-#             return;
-#             }
-#             console.log("[sidebarDebug] header found. parentDoc === document?", parentDoc === document);
-#
-#
-#             let button = parentDoc.getElementById("customSettingsBtn");
-#             if (!button) {
-#                 button = parentDoc.createElement("button");
-#                 button.id = "customSettingsBtn";
-#                 button.innerHTML = "⚙️";
-#                 button.style.position = "absolute";
-#                 button.style.left = "1.5rem";
-#                 button.style.top = "50%";
-#                 button.style.transform = "translateY(-50%)";
-#                 button.style.background = "none";
-#                 button.style.border = "none";
-#                 button.style.cursor = "pointer";
-#                 button.style.fontSize = "1.25rem";
-#                 button.style.zIndex = "999999";
-#                 button.style.padding = "4px";
-#                 button.style.display = "none";
-#                 button.style.alignItems = "center";
-#                 button.style.justifyContent = "center";
-#                 button.style.color = "var(--text-primary)";
-#                 button.style.transition = "opacity 0.2s ease, transform 0.2s ease";
-#
-#                 button.onmouseover = function() {
-#                     button.style.opacity = "0.7";
-#                     button.style.transform = "translateY(-50%) scale(1.1)";
-#                 };
-#                 button.onmouseout = function() {
-#                     button.style.opacity = "1.0";
-#                     button.style.transform = "translateY(-50%) scale(1.0)";
-#                 };
-#
-#                 button.onclick = function() {
-#                     const collapsedBtn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
-#                                          parentDoc.querySelector('[data-testid="collapsedSidebar"] button') ||
-#                                          parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
-#                                          parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
-#                                          parentDoc.querySelector('button[aria-label="Open sidebar"]');
-#                     if (collapsedBtn) {
-#                         collapsedBtn.click();
-#                     } else {
-#                         const closeBtn = parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button') ||
-#                                          parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"]') ||
-#                                          parentDoc.querySelector('button[aria-label="Close sidebar"]');
-#                         if (closeBtn) {
-#                             closeBtn.click();
-#                         }
-#                     }
-#                 };
-#
-#                 header.appendChild(button);
-#             } else if (button.parentNode !== header) {
-#                 header.appendChild(button);
-#             }
-#
-#             // Robust check if sidebar is collapsed (closed)
-#             const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
-#             const collapsedControl = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
-#                                      parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
-#                                      parentDoc.querySelector('button[aria-label="Open sidebar"]');
-#             console.log("[sidebarDebug] sidebar found?", !!sidebar, "collapsedControl found?", !!collapsedControl);
-#             let isClosed = false;
-#             if (collapsedControl) {
-#                 isClosed = true;
-#             } else if (sidebar) {
-#                 const ariaExpanded = sidebar.getAttribute('aria-expanded');
-#                 if (ariaExpanded === 'false') {
-#                     isClosed = true;
-#                 } else {
-#                     const rect = sidebar.getBoundingClientRect();
-#                     if (rect.width === 0 || rect.left < 0) {
-#                         isClosed = true;
-#                     }
-#                 }
-#             } else {
-#                 isClosed = true;
-#             }
-#
-#             // Obtain or create custom header offset style
-#             let styleEl = parentDoc.getElementById("customHeaderStyle");
-#             if (!styleEl) {
-#                 styleEl = parentDoc.createElement("style");
-#                 styleEl.id = "customHeaderStyle";
-#                 parentDoc.head.appendChild(styleEl);
-#             } else if (styleEl.parentNode !== parentDoc.head) {
-#                 parentDoc.head.appendChild(styleEl);
-#             }
-#
-#             if (isClosed) {
-#                 button.style.display = "flex";
-#                 styleEl.innerHTML = `
-#                     header[data-testid="stHeader"]::before {
-#                         left: 3.5rem !important;
-#                     }
-#                 `;
-#             } else {
-#                 button.style.display = "none";
-#                 styleEl.innerHTML = `
-#                     header[data-testid="stHeader"]::before {
-#                         left: 1.5rem !important;
-#                     }
-#                 `;
-#             }
-#         } catch (e) {
-#             console.error("Error managing custom settings button:", e);
-#         }
-#     }
-#
-#     updateSidebarToggleUI();
-#     setInterval(updateSidebarToggleUI, 200);
-# })();
-# </script>
-# """
-
-# reopen_sidebar_js = """
-# <script>
-# (function() {
-#     // On Cloud, we cannot access window.parent.document due to CORS.
-#     // We must stick to 'document'.
-#     const doc = document;
-#
-#     function updateSidebarToggleUI() {
-#         try {
-#             // 1. Find the Streamlit Header
-#             const header = doc.querySelector('header[data-testid="stHeader"]');
-#             if (!header) return;
-#
-#             // 2. Manage our custom Gear button
-#             let button = doc.getElementById("customSettingsBtn");
-#             if (!button) {
-#                 button = doc.createElement("button");
-#                 button.id = "customSettingsBtn";
-#                 button.innerHTML = "⚙️";
-#                 button.style.cssText = `
-#                     position: absolute;
-#                     left: 1rem;
-#                     top: 50%;
-#                     transform: translateY(-50%);
-#                     background: none;
-#                     border: none;
-#                     cursor: pointer;
-#                     font-size: 1.5rem;
-#                     z-index: 999999;
-#                     display: flex;
-#                     align-items: center;
-#                     justify-content: center;
-#                     color: var(--text-primary);
-#                     transition: transform 0.2s ease;
-#                 `;
-#
-#                 button.onclick = function() {
-#                     // Find the native Streamlit collapse/expand button
-#                     const openBtn = doc.querySelector('button[aria-label="Open sidebar"]');
-#                     const closeBtn = doc.querySelector('button[aria-label="Close sidebar"]');
-#
-#                     if (openBtn) {
-#                         openBtn.click();
-#                     } else if (closeBtn) {
-#                         // Optional: if you want the gear to also close it
-#                         closeBtn.click();
-#                     }
-#                 };
-#
-#                 header.appendChild(button);
-#             }
-#
-#             // 3. Logic to show/hide the button based on sidebar state
-#             // We check if the sidebar is currently hidden
-#             const sidebar = doc.querySelector('[data-testid="stSidebar"]');
-#             const isCollapsed = !sidebar || sidebar.getAttribute('aria-expanded') === 'false';
-#
-#             // Check for the specific 'collapsed control' element Streamlit uses
-#             const collapsedControl = doc.querySelector('[data-testid="stSidebarCollapsedControl"]');
-#
-#             if (collapsedControl || isCollapsed) {
-#                 button.style.display = "flex";
-#                 // Shift the "Enterprise RAG Assistant" text to the right so it doesn't overlap
-#                 let styleEl = doc.getElementById("customHeaderStyle");
-#                 if (!styleEl) {
-#                     styleEl = doc.createElement("style");
-#                     styleEl.id = "customHeaderStyle";
-#                     doc.head.appendChild(styleEl);
-#                 }
-#                 styleEl.innerHTML = `
-#                     header[data-testid="stHeader"]::before {
-#                         left: 3.5rem !important;
-#                     }
-#                 `;
-#             } else {
-#                 // If sidebar is open, we can hide our custom gear (since native 'X' is visible)
-#                 button.style.display = "none";
-#                 let styleEl = doc.getElementById("customHeaderStyle");
-#                 if (styleEl) {
-#                     styleEl.innerHTML = `
-#                         header[data-testid="stHeader"]::before {
-#                             left: 1.5rem !important;
-#                         }
-#                     `;
-#                 }
-#             }
-#         } catch (e) {
-#             console.error("Sidebar JS Error:", e);
-#         }
-#     }
-#
-#     // Run frequently to catch UI changes
-#     setInterval(updateSidebarToggleUI, 300);
-# })();
-# </script>
-# """
-
-
 reopen_sidebar_js = """
 <script>
 (function() {
-    const doc = document;
-
-    // 1. Function to trigger the sidebar toggle
-    function toggleSidebar() {
-        // Broad selectors to find the Streamlit "Open" button
-        const selectors = [
-            '[data-testid="stSidebarCollapsedControl"] button',
-            'button[aria-label="Open sidebar"]',
-            '.st-emotion-cache-6qob1r', // Common dynamic class
-            '[data-testid="collapsedSidebar"]'
-        ];
-        let target = null;
-        for (let s of selectors) {
-            target = doc.querySelector(s);
-            if (target) break;
+    let parentDoc = document;
+    try {
+        if (window.parent && window.parent.document && window.parent.document.body) {
+            parentDoc = window.parent.document;
         }
+    } catch (e) {
+        parentDoc = document;
+    }
 
-        if (target) {
-            target.click();
-            // Fallback for React: trigger a full mouse event
-            target.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, view: window}));
+    function updateSidebarToggleUI() {
+        try {
+            const header = parentDoc.querySelector('header[data-testid="stHeader"]');
+            if (!header) return;
+
+            let button = parentDoc.getElementById("customSettingsBtn");
+            if (!button) {
+                button = parentDoc.createElement("button");
+                button.id = "customSettingsBtn";
+                button.innerHTML = "⚙️";
+                button.style.position = "absolute";
+                button.style.left = "1.5rem";
+                button.style.top = "50%";
+                button.style.transform = "translateY(-50%)";
+                button.style.background = "none";
+                button.style.border = "none";
+                button.style.cursor = "pointer";
+                button.style.fontSize = "1.25rem";
+                button.style.zIndex = "999999";
+                button.style.padding = "4px";
+                button.style.display = "none";
+                button.style.alignItems = "center";
+                button.style.justifyContent = "center";
+                button.style.color = "var(--text-primary)";
+                button.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+
+                button.onmouseover = function() {
+                    button.style.opacity = "0.7";
+                    button.style.transform = "translateY(-50%) scale(1.1)";
+                };
+                button.onmouseout = function() {
+                    button.style.opacity = "1.0";
+                    button.style.transform = "translateY(-50%) scale(1.0)";
+                };
+
+                button.onclick = function() {
+                    const collapsedBtn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
+                                         parentDoc.querySelector('[data-testid="collapsedSidebar"] button') || 
+                                         parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+                                         parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+                                         parentDoc.querySelector('button[aria-label="Open sidebar"]');
+                    if (collapsedBtn) {
+                        collapsedBtn.click();
+                    } else {
+                        const closeBtn = parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button') ||
+                                         parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"]') ||
+                                         parentDoc.querySelector('button[aria-label="Close sidebar"]');
+                        if (closeBtn) {
+                            closeBtn.click();
+                        }
+                    }
+                };
+
+                header.appendChild(button);
+            } else if (button.parentNode !== header) {
+                header.appendChild(button);
+            }
+
+            // Robust check if sidebar is collapsed (closed)
+            const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
+            const collapsedControl = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') || 
+                                     parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+                                     parentDoc.querySelector('button[aria-label="Open sidebar"]');
+
+            let isClosed = false;
+            if (collapsedControl) {
+                isClosed = true;
+            } else if (sidebar) {
+                const ariaExpanded = sidebar.getAttribute('aria-expanded');
+                if (ariaExpanded === 'false') {
+                    isClosed = true;
+                } else {
+                    const rect = sidebar.getBoundingClientRect();
+                    if (rect.width === 0 || rect.left < 0) {
+                        isClosed = true;
+                    }
+                }
+            } else {
+                isClosed = true;
+            }
+
+            // Obtain or create custom header offset style
+            let styleEl = parentDoc.getElementById("customHeaderStyle");
+            if (!styleEl) {
+                styleEl = parentDoc.createElement("style");
+                styleEl.id = "customHeaderStyle";
+                parentDoc.head.appendChild(styleEl);
+            } else if (styleEl.parentNode !== parentDoc.head) {
+                parentDoc.head.appendChild(styleEl);
+            }
+
+            if (isClosed) {
+                button.style.display = "flex";
+                styleEl.innerHTML = `
+                    header[data-testid="stHeader"]::before {
+                        left: 3.5rem !important;
+                    }
+                `;
+            } else {
+                button.style.display = "none";
+                styleEl.innerHTML = `
+                    header[data-testid="stHeader"]::before {
+                        left: 1.5rem !important;
+                    }
+                `;
+            }
+        } catch (e) {
+            console.error("Error managing custom settings button:", e);
         }
     }
 
-    // 2. Function to create/ensure the gear button exists
-    function ensureGearButton() {
-        const header = doc.querySelector('header[data-testid="stHeader"]');
-        if (!header) return;
-
-        let gearBtn = doc.getElementById("customSettingsBtn");
-        // If button doesn't exist, create it
-        if (!gearBtn) {
-            gearBtn = doc.createElement("button");
-            gearBtn.id = "customSettingsBtn";
-            gearBtn.innerHTML = "⚙️";
-            gearBtn.style.cssText = `
-                position: absolute;
-                left: 10px;
-                top: 50%;
-                transform: translateY(-50%);
-                background: none;
-                border: none;
-                cursor: pointer;
-                font-size: 24px;
-                z-index: 999999;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 5px;
-            `;
-            gearBtn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                toggleSidebar();
-            };
-            header.appendChild(gearBtn);
-        }
-
-        // 3. Logic: Should the button be visible?
-        // We show the gear ONLY if the sidebar is closed.
-        const sidebar = doc.querySelector('[data-testid="stSidebar"]');
-        const isSidebarVisible = sidebar && sidebar.getBoundingClientRect().width > 0;
-
-        if (!isSidebarVisible) {
-            gearBtn.style.display = "flex";
-            // Adjust the header title text offset
-            header.style.paddingLeft = "45px"; 
-        } else {
-            gearBtn.style.display = "none";
-            header.style.paddingLeft = "0px";
-        }
-    }
-
-    // 4. THE FIX: MutationObserver
-    // This watches the body for ANY changes and ensures our button stays in the header
-    const observer = new MutationObserver(() => {
-        ensureGearButton();
-    });
-
-    observer.observe(doc.body, {
-        childList: true,
-        subtree: true
-    });
-
-    // Initial call
-    ensureGearButton();
+    updateSidebarToggleUI();
+    setInterval(updateSidebarToggleUI, 200);
 })();
 </script>
 """
@@ -1294,8 +1094,9 @@ def get_plain_text(content):
     if "\n\n**Sources:**" in content:
         return content.split("\n\n**Sources:**")[0].strip()
     if "\n\n*(Answer generated using general AI knowledge)*" in content:
-        return content.split("\n\n*(AI knowledge )*")[0].strip()
+        return content.split("\n\n*(Answer generated using general AI knowledge)*")[0].strip()
     return content.strip()
+
 
 def render_action_buttons(content, idx):
     plain_text = get_plain_text(content)
