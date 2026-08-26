@@ -1025,10 +1025,12 @@ if "vectorstore" not in st.session_state:
 
 # Process PDF Upload Handlers
 if process_btn and uploaded_file:
-    chunks = get_pdf_documents(uploaded_file)
+    chunks = []
+    for file in uploaded_file:
+        chunks.extend(get_pdf_documents(file))
     vectorstore = get_vectorstore(chunks, store_dir, st.session_state.embeddings)
     st.session_state.vectorstore = vectorstore
-    st.success("Document indexed successfully!")
+    st.success("Documents indexed successfully!")
     st.rerun()
 
 # Handle Clear Vectorstore Action
