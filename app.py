@@ -3,7 +3,9 @@ import uuid
 import ast
 import shutil
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
+
 
 # Load environment variables
 load_dotenv()
@@ -187,7 +189,7 @@ Answer:"""
         formatted_sources = " | ".join(citation_strings)
         final_response = f"{answer}\n\n**Sources:** {formatted_sources}"
     else:
-        final_response = f"{answer}\n\n*(Answer generated using general AI knowledge)*"
+        final_response = f"{answer}\n\n*(AI knowledge)*"
 
     return {"response": final_response}
 
@@ -906,7 +908,8 @@ reopen_sidebar_js = """
 })();
 </script>
 """
-st.html(reopen_sidebar_js, unsafe_allow_javascript=True)
+# st.html(reopen_sidebar_js, unsafe_allow_javascript=True)
+components.html(reopen_sidebar_js, height=0)
 
 # Intercept close/reload window if data active in session
 if st.session_state.get("vectorstore") is not None:
@@ -923,7 +926,9 @@ if st.session_state.get("vectorstore") is not None:
         window.addEventListener('beforeunload', window._closeHandler);
     </script>
     """
-    st.html(prevent_close_js, unsafe_allow_javascript=True)
+    # st.html(prevent_close_js, unsafe_allow_javascript=True)
+    components.html(prevent_close_js, height=0)
+
 else:
     remove_close_js = """
     <script>
@@ -932,7 +937,9 @@ else:
         }
     </script>
     """
-    st.html(remove_close_js, unsafe_allow_javascript=True)
+    # st.html(remove_close_js, unsafe_allow_javascript=True)
+    components.html(remove_close_js, height=0)
+
 
 store_dir = "faiss_index_store_new"
 
@@ -1096,7 +1103,7 @@ def get_plain_text(content):
     if "\n\n**Sources:**" in content:
         return content.split("\n\n**Sources:**")[0].strip()
     if "\n\n*(Answer generated using general AI knowledge)*" in content:
-        return content.split("\n\n*(Answer generated using general AI knowledge)*")[0].strip()
+        return content.split("\n\n*(AI knowledge)*")[0].strip()
     return content.strip()
 
 
