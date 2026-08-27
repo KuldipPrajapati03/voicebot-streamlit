@@ -780,6 +780,135 @@ chat_css = chat_css.replace(
 st.html(chat_css)
 
 # Reopen sidebar script via header settings button (⚙️)
+# reopen_sidebar_js = """
+# <script>
+# (function() {
+#     let parentDoc = document;
+#     try {
+#         if (window.parent && window.parent.document && window.parent.document.body) {
+#             parentDoc = window.parent.document;
+#         }
+#     } catch (e) {
+#         parentDoc = document;
+#     }
+#
+#     function updateSidebarToggleUI() {
+#         try {
+#             const header = parentDoc.querySelector('header[data-testid="stHeader"]');
+#             if (!header) return;
+#
+#             let button = parentDoc.getElementById("customSettingsBtn");
+#             if (!button) {
+#                 button = parentDoc.createElement("button");
+#                 button.id = "customSettingsBtn";
+#                 button.innerHTML = "⚙️";
+#                 button.style.position = "absolute";
+#                 button.style.left = "1.5rem";
+#                 button.style.top = "50%";
+#                 button.style.transform = "translateY(-50%)";
+#                 button.style.background = "none";
+#                 button.style.border = "none";
+#                 button.style.cursor = "pointer";
+#                 button.style.fontSize = "1.25rem";
+#                 button.style.zIndex = "999999";
+#                 button.style.padding = "4px";
+#                 button.style.display = "none";
+#                 button.style.alignItems = "center";
+#                 button.style.justifyContent = "center";
+#                 button.style.color = "var(--text-primary)";
+#                 button.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+#
+#                 button.onmouseover = function() {
+#                     button.style.opacity = "0.7";
+#                     button.style.transform = "translateY(-50%) scale(1.1)";
+#                 };
+#                 button.onmouseout = function() {
+#                     button.style.opacity = "1.0";
+#                     button.style.transform = "translateY(-50%) scale(1.0)";
+#                 };
+#
+#                 button.onclick = function() {
+#                     const collapsedBtn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
+#                                          parentDoc.querySelector('[data-testid="collapsedSidebar"] button') ||
+#                                          parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+#                                          parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+#                                          parentDoc.querySelector('button[aria-label="Open sidebar"]');
+#                     if (collapsedBtn) {
+#                         collapsedBtn.click();
+#                     } else {
+#                         const closeBtn = parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button') ||
+#                                          parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"]') ||
+#                                          parentDoc.querySelector('button[aria-label="Close sidebar"]');
+#                         if (closeBtn) {
+#                             closeBtn.click();
+#                         }
+#                     }
+#                 };
+#
+#                 header.appendChild(button);
+#             } else if (button.parentNode !== header) {
+#                 header.appendChild(button);
+#             }
+#
+#             // Robust check if sidebar is collapsed (closed)
+#             const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
+#             const collapsedControl = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+#                                      parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+#                                      parentDoc.querySelector('button[aria-label="Open sidebar"]');
+#
+#             let isClosed = false;
+#             if (collapsedControl) {
+#                 isClosed = true;
+#             } else if (sidebar) {
+#                 const ariaExpanded = sidebar.getAttribute('aria-expanded');
+#                 if (ariaExpanded === 'false') {
+#                     isClosed = true;
+#                 } else {
+#                     const rect = sidebar.getBoundingClientRect();
+#                     if (rect.width === 0 || rect.left < 0) {
+#                         isClosed = true;
+#                     }
+#                 }
+#             } else {
+#                 isClosed = true;
+#             }
+#
+#             // Obtain or create custom header offset style
+#             let styleEl = parentDoc.getElementById("customHeaderStyle");
+#             if (!styleEl) {
+#                 styleEl = parentDoc.createElement("style");
+#                 styleEl.id = "customHeaderStyle";
+#                 parentDoc.head.appendChild(styleEl);
+#             } else if (styleEl.parentNode !== parentDoc.head) {
+#                 parentDoc.head.appendChild(styleEl);
+#             }
+#
+#             if (isClosed) {
+#                 button.style.display = "flex";
+#                 styleEl.innerHTML = `
+#                     header[data-testid="stHeader"]::before {
+#                         left: 3.5rem !important;
+#                     }
+#                 `;
+#             } else {
+#                 button.style.display = "none";
+#                 styleEl.innerHTML = `
+#                     header[data-testid="stHeader"]::before {
+#                         left: 1.5rem !important;
+#                     }
+#                 `;
+#             }
+#         } catch (e) {
+#             console.error("Error managing custom settings button:", e);
+#         }
+#     }
+#
+#     updateSidebarToggleUI();
+#     setInterval(updateSidebarToggleUI, 200);
+# })();
+# </script>
+# """
+
 reopen_sidebar_js = """
 <script>
 (function() {
@@ -788,8 +917,12 @@ reopen_sidebar_js = """
         if (window.parent && window.parent.document && window.parent.document.body) {
             parentDoc = window.parent.document;
         }
-    } catch (e) {
-        parentDoc = document;
+    } catch (e) { parentDoc = document; }
+
+    // Clear any interval left over from a previous rerun
+    if (parentDoc._customSidebarInterval) {
+        clearInterval(parentDoc._customSidebarInterval);
+        parentDoc._customSidebarInterval = null;
     }
 
     function updateSidebarToggleUI() {
@@ -797,117 +930,87 @@ reopen_sidebar_js = """
             const header = parentDoc.querySelector('header[data-testid="stHeader"]');
             if (!header) return;
 
+            // Recreate the button only if it's missing from the LIVE dom
             let button = parentDoc.getElementById("customSettingsBtn");
-            if (!button) {
+            if (button && !parentDoc.body.contains(header) ? false : !header.contains(button)) {
+                header.appendChild(button);
+            }
+            if (!button || !parentDoc.body.contains(button)) {
                 button = parentDoc.createElement("button");
                 button.id = "customSettingsBtn";
                 button.innerHTML = "⚙️";
-                button.style.position = "absolute";
-                button.style.left = "1.5rem";
-                button.style.top = "50%";
-                button.style.transform = "translateY(-50%)";
-                button.style.background = "none";
-                button.style.border = "none";
-                button.style.cursor = "pointer";
-                button.style.fontSize = "1.25rem";
-                button.style.zIndex = "999999";
-                button.style.padding = "4px";
-                button.style.display = "none";
-                button.style.alignItems = "center";
-                button.style.justifyContent = "center";
-                button.style.color = "var(--text-primary)";
-                button.style.transition = "opacity 0.2s ease, transform 0.2s ease";
-
-                button.onmouseover = function() {
-                    button.style.opacity = "0.7";
-                    button.style.transform = "translateY(-50%) scale(1.1)";
-                };
-                button.onmouseout = function() {
-                    button.style.opacity = "1.0";
-                    button.style.transform = "translateY(-50%) scale(1.0)";
-                };
-
-                button.onclick = function() {
-                    const collapsedBtn = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
-                                         parentDoc.querySelector('[data-testid="collapsedSidebar"] button') || 
-                                         parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
-                                         parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
-                                         parentDoc.querySelector('button[aria-label="Open sidebar"]');
-                    if (collapsedBtn) {
-                        collapsedBtn.click();
-                    } else {
-                        const closeBtn = parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button') ||
-                                         parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"]') ||
-                                         parentDoc.querySelector('button[aria-label="Close sidebar"]');
-                        if (closeBtn) {
-                            closeBtn.click();
-                        }
-                    }
-                };
-
+                Object.assign(button.style, {
+                    position: "absolute", left: "1.5rem", top: "50%",
+                    transform: "translateY(-50%)", background: "none", border: "none",
+                    cursor: "pointer", fontSize: "1.25rem", zIndex: "999999",
+                    padding: "4px", display: "none", alignItems: "center",
+                    justifyContent: "center", color: "var(--text-primary)",
+                    transition: "opacity 0.2s ease, transform 0.2s ease"
+                });
                 header.appendChild(button);
             } else if (button.parentNode !== header) {
                 header.appendChild(button);
             }
 
-            // Robust check if sidebar is collapsed (closed)
+            // Re-bind the click handler every pass so it never goes stale
+            button.onmouseover = function() {
+                button.style.opacity = "0.7";
+                button.style.transform = "translateY(-50%) scale(1.1)";
+            };
+            button.onmouseout = function() {
+                button.style.opacity = "1.0";
+                button.style.transform = "translateY(-50%) scale(1.0)";
+            };
+            button.onclick = function() {
+                const collapsedBtn =
+                    parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"] button') ||
+                    parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+                    parentDoc.querySelector('[data-testid="collapsedSidebar"] button') ||
+                    parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+                    parentDoc.querySelector('button[aria-label="Open sidebar"]');
+                if (collapsedBtn) { collapsedBtn.click(); return; }
+                const closeBtn =
+                    parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button') ||
+                    parentDoc.querySelector('[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"]') ||
+                    parentDoc.querySelector('button[aria-label="Close sidebar"]');
+                if (closeBtn) closeBtn.click();
+            };
+
+            // Decide visibility
             const sidebar = parentDoc.querySelector('[data-testid="stSidebar"]');
-            const collapsedControl = parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') || 
-                                     parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
-                                     parentDoc.querySelector('button[aria-label="Open sidebar"]');
+            const collapsedControl =
+                parentDoc.querySelector('[data-testid="stSidebarCollapsedControl"]') ||
+                parentDoc.querySelector('[data-testid="collapsedSidebar"]') ||
+                parentDoc.querySelector('button[aria-label="Open sidebar"]');
 
             let isClosed = false;
-            if (collapsedControl) {
-                isClosed = true;
-            } else if (sidebar) {
-                const ariaExpanded = sidebar.getAttribute('aria-expanded');
-                if (ariaExpanded === 'false') {
-                    isClosed = true;
-                } else {
-                    const rect = sidebar.getBoundingClientRect();
-                    if (rect.width === 0 || rect.left < 0) {
-                        isClosed = true;
-                    }
-                }
-            } else {
-                isClosed = true;
-            }
+            if (collapsedControl) isClosed = true;
+            else if (sidebar) {
+                const ae = sidebar.getAttribute('aria-expanded');
+                if (ae === 'false') isClosed = true;
+                else { const r = sidebar.getBoundingClientRect(); if (r.width === 0 || r.left < 0) isClosed = true; }
+            } else isClosed = true;
 
-            // Obtain or create custom header offset style
             let styleEl = parentDoc.getElementById("customHeaderStyle");
-            if (!styleEl) {
-                styleEl = parentDoc.createElement("style");
-                styleEl.id = "customHeaderStyle";
-                parentDoc.head.appendChild(styleEl);
-            } else if (styleEl.parentNode !== parentDoc.head) {
-                parentDoc.head.appendChild(styleEl);
-            }
+            if (!styleEl) { styleEl = parentDoc.createElement("style"); styleEl.id = "customHeaderStyle"; parentDoc.head.appendChild(styleEl); }
+            else if (styleEl.parentNode !== parentDoc.head) { parentDoc.head.appendChild(styleEl); }
 
             if (isClosed) {
                 button.style.display = "flex";
-                styleEl.innerHTML = `
-                    header[data-testid="stHeader"]::before {
-                        left: 3.5rem !important;
-                    }
-                `;
+                styleEl.innerHTML = 'header[data-testid="stHeader"]::before { left: 3.5rem !important; }';
             } else {
                 button.style.display = "none";
-                styleEl.innerHTML = `
-                    header[data-testid="stHeader"]::before {
-                        left: 1.5rem !important;
-                    }
-                `;
+                styleEl.innerHTML = 'header[data-testid="stHeader"]::before { left: 1.5rem !important; }';
             }
-        } catch (e) {
-            console.error("Error managing custom settings button:", e);
-        }
+        } catch (e) { console.error("settings button:", e); }
     }
 
     updateSidebarToggleUI();
-    setInterval(updateSidebarToggleUI, 200);
+    parentDoc._customSidebarInterval = setInterval(updateSidebarToggleUI, 250);
 })();
 </script>
 """
+
 # st.html(reopen_sidebar_js, unsafe_allow_javascript=True)
 components.html(reopen_sidebar_js, height=0)
 
