@@ -1,4 +1,5 @@
 tesseract-ocr
 poppler-utils
 libmagic-dev
+libreoffice
 libgl1

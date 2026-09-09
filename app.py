@@ -54,6 +54,18 @@ from typing import List
 from typing_extensions import TypedDict
 
 
+
+
+import subprocess
+import io
+import mimetypes
+
+from PIL import Image
+import pytesseract
+
+from bs4 import BeautifulSoup
+from unstructured.partition.image import partition_image
+
 # ==========================================
 # 3. Custom CSS
 # ==========================================
@@ -1381,31 +1393,358 @@ if "graph" not in st.session_state:
 # 5. Text Extraction & Vectorstore
 # ==========================================
 
+
+def convert_to_pdf(file_path):
+    """Convert DOC/DOCX to PDF using LibreOffice."""
+
+    output_dir = os.path.dirname(file_path)
+    pdf_path = os.path.splitext(file_path)[0] + ".pdf"
+
+    subprocess.run(
+        [
+            "soffice",
+            "--headless",
+            "--convert-to",
+            "pdf",
+            "--outdir",
+            output_dir,
+            file_path
+        ],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    if not os.path.exists(pdf_path):
+        raise RuntimeError(
+            f"Failed to convert {file_path} to PDF"
+        )
+
+    return pdf_path
+
+
+def extract_image_documents(file):
+    """
+    Extract text from an uploaded image using OCR.
+    Supports JPG, JPEG, PNG, WEBP, BMP and TIFF.
+    """
+
+    with st.spinner(
+        f"Running OCR on {file.name}..."
+    ):
+
+        image = Image.open(
+            io.BytesIO(file.getvalue())
+        )
+
+        # OCR
+        text = pytesseract.image_to_string(
+            image
+        )
+
+    if not text.strip():
+        return []
+
+    return [
+        Document(
+            page_content=text.strip(),
+
+            metadata={
+                "source": file.name,
+                "page": 1,
+                "element_id": str(uuid.uuid4()),
+                "element_type": "ImageOCR",
+                "content_type": "ocr"
+            }
+        )
+    ]
+
+
+def extract_pdf_documents(
+    pdf_path,
+    original_filename
+):
+    """
+    Extract text, tables and OCR content
+    from a PDF using Unstructured.
+    """
+
+    with st.spinner(
+        f"Extracting content from {original_filename}..."
+    ):
+
+        elements = partition_pdf(
+            filename=pdf_path,
+
+            # Better for scanned documents,
+            # tables and complex layouts.
+            strategy="hi_res",
+
+            infer_table_structure=True,
+
+            languages=["eng"],
+
+            chunking_strategy="by_title",
+
+            max_characters=4000,
+
+            new_after_n_chars=3800,
+
+            combine_text_under_n_chars=2000
+        )
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+
+        separators=[
+            "\n\n",
+            "\n",
+            ". ",
+            " ",
+            ""
+        ]
+    )
+
+    all_chunks = []
+
+    with st.spinner(
+        f"Creating chunks for {original_filename}..."
+    ):
+
+        for element in elements:
+
+            # --------------------------------------
+            # PAGE NUMBER
+            # --------------------------------------
+
+            page_num = 1
+
+            if hasattr(element, "metadata"):
+
+                page_num = getattr(
+                    element.metadata,
+                    "page_number",
+                    None
+                ) or 1
+
+            # --------------------------------------
+            # ELEMENT ID
+            # --------------------------------------
+
+            element_id = getattr(
+                element,
+                "id",
+                None
+            ) or str(uuid.uuid4())
+
+            # --------------------------------------
+            # ELEMENT TYPE
+            # --------------------------------------
+
+            element_type = type(element).__name__
+
+            # --------------------------------------
+            # TEXT
+            # --------------------------------------
+
+            element_text = getattr(
+                element,
+                "text",
+                ""
+            ) or ""
+
+            content_type = "text"
+
+            # --------------------------------------
+            # TABLE
+            # --------------------------------------
+
+            if element_type == "Table":
+
+                content_type = "table"
+
+                table_html = ""
+
+                if hasattr(element, "metadata"):
+
+                    table_html = getattr(
+                        element.metadata,
+                        "text_as_html",
+                        ""
+                    ) or ""
+
+                if table_html:
+
+                    soup = BeautifulSoup(
+                        table_html,
+                        "html.parser"
+                    )
+
+                    rows = []
+
+                    for row in soup.find_all("tr"):
+
+                        cells = [
+                            cell.get_text(
+                                " ",
+                                strip=True
+                            )
+                            for cell in row.find_all(
+                                ["th", "td"]
+                            )
+                        ]
+
+                        if cells:
+
+                            rows.append(
+                                " | ".join(cells)
+                            )
+
+                    element_text = "\n".join(
+                        rows
+                    )
+
+            # --------------------------------------
+            # IMAGE / FIGURE
+            # --------------------------------------
+
+            elif element_type in [
+                "Image",
+                "Figure"
+            ]:
+
+                content_type = "image"
+
+            # --------------------------------------
+            # SKIP EMPTY ELEMENTS
+            # --------------------------------------
+
+            if not element_text.strip():
+                continue
+
+            # --------------------------------------
+            # CHUNK
+            # --------------------------------------
+
+            chunks = text_splitter.split_text(
+                element_text.strip()
+            )
+
+            for chunk in chunks:
+
+                if not chunk.strip():
+                    continue
+
+                all_chunks.append(
+                    Document(
+                        page_content=chunk,
+
+                        metadata={
+                            "source": original_filename,
+                            "page": page_num,
+                            "element_id": str(element_id),
+                            "element_type": element_type,
+                            "content_type": content_type
+                        }
+                    )
+                )
+
+    return all_chunks
+
+
 def get_pdf_documents(file):
-
     """
-    Extract PDF elements and convert them into
-    LangChain Documents with metadata.
+    Main document ingestion function.
+
+    Supports:
+    PDF
+    DOC
+    DOCX
+    JPG
+    JPEG
+    PNG
+    WEBP
+    BMP
+    TIFF
     """
 
-    temp_file = f"temp_{uuid.uuid4()}.pdf"
+    original_filename = file.name
+
+    extension = os.path.splitext(
+        original_filename
+    )[1].lower()
+
+    temp_file = (
+        f"temp_{uuid.uuid4()}{extension}"
+    )
 
     with open(temp_file, "wb") as f:
         f.write(file.getvalue())
 
+    pdf_path = None
+
     try:
 
-        with st.spinner(
-            f"Extracting text from {file.name}..."
-        ):
+        # ==========================================
+        # IMAGE
+        # ==========================================
 
-            elements = partition_pdf(
-                filename=temp_file,
-                infer_table_structure=True,
-                chunking_strategy="by_title",
-                max_characters=4000,
-                new_after_n_chars=3800,
-                combine_text_under_n_chars=2000,
+        if extension in [
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".bmp",
+            ".tiff"
+        ]:
+
+            return extract_image_documents(
+                file
+            )
+
+        # ==========================================
+        # PDF
+        # ==========================================
+
+        elif extension == ".pdf":
+
+            return extract_pdf_documents(
+                temp_file,
+                original_filename
+            )
+
+        # ==========================================
+        # DOC / DOCX
+        # ==========================================
+
+        elif extension in [
+            ".doc",
+            ".docx"
+        ]:
+
+            with st.spinner(
+                f"Converting {original_filename} to PDF..."
+            ):
+
+                pdf_path = convert_to_pdf(
+                    temp_file
+                )
+
+            return extract_pdf_documents(
+                pdf_path,
+                original_filename
+            )
+
+        # ==========================================
+        # UNSUPPORTED
+        # ==========================================
+
+        else:
+
+            raise ValueError(
+                f"Unsupported file type: "
+                f"{original_filename}"
             )
 
     finally:
@@ -1413,60 +1752,11 @@ def get_pdf_documents(file):
         if os.path.exists(temp_file):
             os.remove(temp_file)
 
-    with st.spinner(
-        f"Chunking {file.name}..."
-    ):
-
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200
-        )
-
-        all_chunks = []
-
-        for element in elements:
-
-            page_num = (
-                element.metadata.page_number
-                if hasattr(element, "metadata")
-                and element.metadata.page_number
-                else 1
-            )
-
-            element_id = getattr(
-                element,
-                "id",
-                str(uuid.uuid4())
-            )
-
-            element_text = getattr(
-                element,
-                "text",
-                ""
-            )
-
-            if not element_text:
-                continue
-
-            splits = text_splitter.split_text(
-                element_text
-            )
-
-            for chunk in splits:
-
-                doc = Document(
-                    page_content=chunk,
-
-                    metadata={
-                        "source": file.name,
-                        "page": page_num,
-                        "element_id": str(element_id)
-                    }
-                )
-
-                all_chunks.append(doc)
-
-    return all_chunks
+        if (
+            pdf_path
+            and os.path.exists(pdf_path)
+        ):
+            os.remove(pdf_path)
 
 
 def get_vectorstore(
@@ -1635,7 +1925,7 @@ def retrieve_node(state: State):
 
     retriever = vectorstore.as_retriever(
         search_kwargs={
-            "k": 4
+            "k": 5
         }
     )
 
@@ -1646,10 +1936,11 @@ def retrieve_node(state: State):
     context_with_ids = "\n\n".join(
         [
             (
-                f"ID: "
-                f"{doc.metadata.get('element_id', 'N/A')}\n"
-                f"Content: "
-                f"{doc.page_content}"
+                f"ID: {doc.metadata.get('element_id', 'N/A')}\n"
+                f"Source: {doc.metadata.get('source', 'N/A')}\n"
+                f"Page: {doc.metadata.get('page', 'N/A')}\n"
+                f"Type: {doc.metadata.get('content_type', 'text')}\n"
+                f"Content: {doc.page_content}"
             )
             for doc in docs
         ]
@@ -2662,12 +2953,10 @@ if st.session_state.config_open:
         # ======================================
         st.header("📂 Knowledge Base")
 
-        uploaded_file = st.file_uploader(
-            "Upload Document",
-            type=["pdf"],
-            accept_multiple_files=True,
-            key="config_pdf_uploader"
-        )
+
+        uploaded_file = st.file_uploader("Upload Document",
+                                         type=["pdf", "doc", "docx", "jpg", "jpeg", "png", "webp", "bmp", "tiff"],
+                                         accept_multiple_files=True, key="config_pdf_uploader")
 
         col1, col2 = st.columns(2)
 
@@ -2687,11 +2976,11 @@ if st.session_state.config_open:
             )
 
         # ======================================
-        # Process PDFs
+        # Process Documents
         # ======================================
         if process_btn:
             if not uploaded_file:
-                st.warning("Please upload at least one PDF document.")
+                st.warning("Please upload at least one document.")
             else:
                 chunks = []
 
@@ -2961,12 +3250,12 @@ if not st.session_state.messages:
         <div class="welcome-icon">📚</div>
         <div class="welcome-title">Welcome to your PDF RAG Workspace</div>
         <div class="welcome-subtitle">
-            Upload PDF documents using the sidebar, then ask questions about their content.
-            The AI will retrieve relevant context and cite sources.
+            Upload PDF, DOC, DOCX, JPG, JPEG, PNG, WEBP, BMP, or TIFF documents using the sidebar, then ask questions about their content.
+            The AI will retrieve relevant information from the uploaded documents and provide answers with source citations.
             <br><br>
             You can also click <b>+</b> to upload an image and ask questions about it.
         </div>
-    </div>
+    </div>  
     """)
 
 
@@ -3019,113 +3308,6 @@ else:
                     idx
                 )
 
-
-# ==========================================
-# 22. Image Attachment UI
-# ==========================================
-
-# plus_col, status_col = st.columns(
-#     [0.08, 0.92]
-# )
-#
-# with plus_col:
-#
-#     if st.button(
-#         "+",
-#         key="image_plus_button",
-#         help="Attach an image"
-#     ):
-#
-#         st.session_state.image_question_mode = (
-#             not st.session_state.image_question_mode
-#         )
-#
-#         st.rerun()
-#
-#
-# with status_col:
-#
-#     if st.session_state.uploaded_image:
-#
-#         st.markdown(
-#             f"""
-#             <div
-#                 style="
-#                     padding:8px 12px;
-#                     border:1px solid #cbd5e1;
-#                     border-radius:8px;
-#                     background:#f8fafc;
-#                     font-size:13px;
-#                 "
-#             >
-#                 🖼️ Attached:
-#                 <b>
-#                     {st.session_state.uploaded_image.name}
-#                 </b>
-#             </div>
-#             """,
-#             unsafe_allow_html=True
-#         )
-
-
-# ==========================================
-# 23. Image Uploader
-# ==========================================
-
-# if st.session_state.image_question_mode:
-#
-#     st.markdown(
-#         """
-#         <div class="image-attachment-box">
-#
-#             <div class="image-attachment-title">
-#                 🖼️ Attach an image
-#             </div>
-#
-#         </div>
-#         """,
-#         unsafe_allow_html=True
-#     )
-#
-#     image_file = st.file_uploader(
-#         "Choose an image",
-#         type=[
-#             "png",
-#             "jpg",
-#             "jpeg",
-#             "webp"
-#         ],
-#         key="chat_image_uploader",
-#         label_visibility="collapsed"
-#     )
-#
-#     if image_file is not None:
-#
-#         st.session_state.uploaded_image = (
-#             image_file
-#         )
-#
-#         st.image(
-#             image_file,
-#             caption="Attached image",
-#             width=350
-#         )
-#
-#         if st.button(
-#             "Remove Image",
-#             key="remove_chat_image"
-#         ):
-#
-#             st.session_state.uploaded_image = None
-#
-#             st.session_state.image_question_mode = False
-#
-#             st.rerun()
-
-
-# ==========================================
-# 24. Chat Input
-# ==========================================
 # ==========================================
 # 24. Chat Input + Image Upload
 # ==========================================
@@ -3142,11 +3324,6 @@ chat_input = st.chat_input(
     max_upload_size=200
 )
 
-
-
-# ==========================================
-# 25. Handle User Question
-# ==========================================
 
 # ==========================================
 # 25. Handle User Question
